@@ -14,6 +14,12 @@
 		<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,700&amp;subset=latin" rel="stylesheet" type="text/css">		
 
 		<style>
+			h1 {
+				font-weight: 700;
+				font-family: 'Open Sans';
+				font-size: 3.5em;
+				margin-bottom: 0em;
+			}
 			table {
 				width:auto;
 				font-weight: 300;
@@ -31,30 +37,22 @@
 			}
 		</style>
 
-	</head>
-	<body>
-		<!--Het schoonmaakrooster-->		
 		<?php 
-			//Set the right timezone
-			date_default_timezone_set("Europe/Amsterdam"); 			
+			// Get the tasks of a week	
+			function getTasks($week) {	
+				$list = array("Stoffen", "Stofzuigen", "WC");
+				if ($week % 2 == 1)
+					$list[0] = "Badkamer";
+				$taak = array( 
+					"M" => $list[$week%3],
+					"J" => $list[($week+1)%3],
+					"T" => $list[($week+2)%3],
+				);
 
-			$week = date ( "W" ); 
-
-			// Reset taskstates if they are from prev. week.
-			// Ignore any POST in this case.
-			if( $week != date("W", filemtime('taskStates.txt')) )	{
-				include 'scripts/reset_taskStates.php';
-				unset($_POST);
+				return $taak;
 			}
 			
-			$taak = array(
-				0 => "Stoffen",
-				1 => "Stofzuigen",
-				2 => "WC",
-			);
-			if ($week % 2 == 1)
-				$taak[0] = "Badkamer";
-
+			// Get the states of the tasks from the file. '' or 'checked'
 			function getTaskState($person) {
 				if(file_exists('taskStates.txt')) {
 					$taskStates = unserialize(file_get_contents('taskStates.txt'));
@@ -67,6 +65,24 @@
 					file_put_contents('taskStates.txt', serialize($taskStates));
 				}
 				return $taskStates[$person];
+			}
+			
+			function resetTaskStates() {
+				if(file_exists('taskStates.txt')) {
+					unlink('taskStates.txt');
+				}
+			}
+			
+			//Set the right timezone
+			date_default_timezone_set("Europe/Amsterdam"); 			
+
+			$week = date ( "W" ); 
+
+			// Reset taskstates if they are from prev. week.
+			// Ignore any POST in this case.
+			if( $week != date("W", filemtime('taskStates.txt')) )	{
+				include 'scripts/reset_taskStates.php';
+				unset($_POST);
 			}
 
 			//handle the submission of tasks
@@ -81,13 +97,22 @@
 				}
 				file_put_contents('taskStates.txt', serialize($taskStates));
 			} 
-		?>	
+
+			$taak = getTasks($week);
+		?>		
+		
+	</head>
+	<body>
+		<!--Titel-->
+		<h1>AvS<span style="font-size:50%"> 179</span></h1>
+
+			<!--Het schoonmaakrooster-->		
 		<form action="default.php" method="post">
 		<table>
 			<input type="hidden" name="posted" value="true">
 			<tr>
 				<td>Martijn:</td>
-				<td><?=$taak[$week%3]?></td>
+				<td><?=$taak["M"]?></td>
 				<td>
 					<input
 					type="checkbox"
@@ -100,7 +125,7 @@
 			</tr>
 			<tr>
 				<td>Jorrit:</td>
-				<td><?=$taak[($week+1)%3]?></td>
+				<td><?=$taak["J"]?></td>
 				<td>
 					<input
 					type="checkbox"
@@ -113,7 +138,7 @@
 			</tr>
 			<tr>
 				<td>Tom:</td>
-				<td><?=$taak[($week+2)%3]?></td>
+				<td><?=$taak["T"]?></td>
 				<td>
 					<input
 					type="checkbox"
@@ -128,11 +153,10 @@
 		</form>
 
 
-		<hr>
-
-
 		<!--The weather widget-->		
-		<iframe src="https://www.meteoblue.com/en/weather/widget/three/delft_netherlands_2757345?geoloc=fixed&nocurrent=1&days=4&tempunit=CELSIUS&windunit=KILOMETER_PER_HOUR&layout=bright"  frameborder="0" scrolling="NO" allowtransparency="true" sandbox="allow-same-origin allow-scripts allow-popups" style="width: 460px;height: 495px"></iframe> 
+		<!--
+		<hr>
+<iframe src="https://www.meteoblue.com/en/weather/widget/three/delft_netherlands_2757345?geoloc=fixed&nocurrent=1&days=4&tempunit=CELSIUS&windunit=KILOMETER_PER_HOUR&layout=bright"  frameborder="0" scrolling="NO" allowtransparency="true" sandbox="allow-same-origin allow-scripts allow-popups" style="width: 460px;height: 495px"></iframe> -->
 		<!--<div> DO NOT REMOVE THIS LINK <a href="https://www.meteoblue.com/en/weather/forecast/week/delft_netherlands_2757345?utm_source=weather_widget&utm_medium=linkus&utm_content=three&utm_campaign=Weather%2BWidget" target="_blank">meteoblue</a></div>-->
 	</body>
 </html>
