@@ -38,67 +38,92 @@
 		</style>
 
 		<?php 
-			// Get the tasks of a week	
-			function getTasks($week) {	
-				$list = array("Stoffen", "Stofzuigen", "WC");
-				if ($week % 2 == 1)
-					$list[0] = "Badkamer";
-				$taak = array( 
-					"M" => $list[$week%3],
-					"J" => $list[($week+1)%3],
-					"T" => $list[($week+2)%3],
-				);
-
-				return $taak;
-			}
-			
-			// Get the states of the tasks from the file. '' or 'checked'
-			function getTaskState($person) {
-				if(file_exists('taskStates.txt')) {
-					$taskStates = unserialize(file_get_contents('taskStates.txt'));
-				} else {
-					$taskStates = array(
-									'taskCheck_M' => '',
-									'taskCheck_J' => '',
-									'taskCheck_T' => '',
-								);
-					file_put_contents('taskStates.txt', serialize($taskStates));
-				}
-				return $taskStates[$person];
-			}
-			
-			function resetTaskStates() {
-				if(file_exists('taskStates.txt')) {
-					unlink('taskStates.txt');
-				}
-			}
-			
 			//Set the right timezone
 			date_default_timezone_set("Europe/Amsterdam"); 			
+			
+			class TaskManager {
+				private $tasks;
+				private $names;
+				private $states;
+				private $week;
 
-			$week = date ( "W" ); 
+				function __construct() {
+					$this->tasks = array(array("Stoffen", "Badkamer"), 
+										 array("Stofzuigen"),
+										 array( "WC"));
+					$this->names = array("Martijn", "Jorrit", "Tom");
+					$this->week = date( "W" );
+				}
 
-			// Reset taskstates if they are from prev. week.
-			// Ignore any POST in this case.
-			if( $week != date("W", filemtime('taskStates.txt')) )	{
-				include 'scripts/reset_taskStates.php';
-				unset($_POST);
+				// Get the tasks of a week	
+				function getTasks() {
+					$weekTasks = array();
+					foreach ($this->names as $i => $name) {
+						$i1 = ($this->week + $i) % count($this->names);
+						$i2 = $this->week % count($this->tasks[$i1]);
+						$weekTasks[$name] = $this->tasks[$i1][$i2];
+					}
+					return $weekTasks;
+				}
+
+				// Get the states of the tasks from the file. '' or 'checked'
+				protected function readTaskStates() {
+					if(file_exists('taskStates.txt')) {
+						if ($this->week == date("W", filemtime('taskStates.txt'))) {
+							$this->states = unserialize(file_get_contents('taskStates.txt'));
+						}
+					} else {
+						$this->resetTaskStates();
+					}
+				}
+
+				// Return the task state of the person.
+				function getTaskState($person) {
+					if (empty($this->states)) {
+						$this->readTaskStates();
+					}
+					return $this->states[$person];
+				}
+				
+				// Save all task states.
+				protected function writeTaskStates() {
+					file_put_contents('taskStates.txt', serialize($this->states));
+				}
+
+				// Set task states to given array.
+				function setTaskStates($taskStates) {
+					$this->states = $taskStates;
+					$this->writeTaskStates();
+				}
+
+				// Reset the states to '' and write.
+				function resetTaskStates() {
+					$this->states = array();
+					foreach ($this->names as $name) {
+						$this->states[$name] = '';
+					}
+					$this->writeTaskStates();
+				}
 			}
+			
+
+
+			$tm = new TaskManager();
 
 			//handle the submission of tasks
 			if(isset($_POST['posted'])) {
 				$taskStates = array();
-				foreach ( array("taskCheck_M", "taskCheck_J", "taskCheck_T") as $checkbox ) {
+				foreach ( array("Martijn", "Jorrit", "Tom") as $checkbox ) {
 					if(isset($_POST[$checkbox])) {
 						$taskStates[$checkbox] = "checked";
 					} else {
 						$taskStates[$checkbox] = "";
 					}
 				}
-				file_put_contents('taskStates.txt', serialize($taskStates));
+				$tm->setTaskStates($taskStates);
 			} 
 
-			$taak = getTasks($week);
+			$taak = $tm->getTasks();
 		?>		
 		
 	</head>
@@ -112,40 +137,40 @@
 			<input type="hidden" name="posted" value="true">
 			<tr>
 				<td>Martijn:</td>
-				<td><?=$taak["M"]?></td>
+				<td><?=$taak["Martijn"]?></td>
 				<td>
 					<input
 					type="checkbox"
-					name="taskCheck_M"
+					name="Martijn"
 					value="checked"
 					onclick="this.form.submit()"
-					<?=getTaskState("taskCheck_M")?>
+					<?=$tm->getTaskState("Martijn")?>
 					>
 				</input></td>
 			</tr>
 			<tr>
 				<td>Jorrit:</td>
-				<td><?=$taak["J"]?></td>
+				<td><?=$taak["Jorrit"]?></td>
 				<td>
 					<input
 					type="checkbox"
-					name="taskCheck_J"
+					name="Jorrit"
 					value="checked"
 					onclick="this.form.submit()"
-					<?=getTaskState("taskCheck_J")?>
+					<?=$tm->getTaskState("Jorrit")?>
 					>
 				</input></td>
 			</tr>
 			<tr>
 				<td>Tom:</td>
-				<td><?=$taak["T"]?></td>
+				<td><?=$taak["Tom"]?></td>
 				<td>
 					<input
 					type="checkbox"
-					name="taskCheck_T"
+					name="Tom"
 					value="checked"
 					onclick="this.form.submit()"
-					<?=getTaskState("taskCheck_T")?>
+					<?=$tm->getTaskState("Tom")?>
 					>
 				</input></td>
 			</tr>
