@@ -46,6 +46,8 @@
 				private $names;
 				private $states;
 				private $week;
+				private $year;
+				private $db;
 
 				function __construct() {
 					$this->tasks = array(array("Stoffen", "Badkamer"), 
@@ -53,6 +55,33 @@
 										 array( "WC"));
 					$this->names = array("Martijn", "Jorrit", "Tom");
 					$this->week = date( "W" );
+					$this->year = date( "Y" );
+
+					$this->initialize_mysql();
+				}
+
+				// Build the mysql table
+				function initialize_mysql() {
+					// sqlserver.php should contain the dbhost, dbuser,
+					// dbpass and dbname variables.
+					include('sqlserver.php')
+					$this->db = new mysqli($dbhost, $dbuser,
+					   					   $dbpass, $dbname);
+					if($this->db->connect_errno > 0)
+					{
+						die('Could not connect: ' .
+						   	$this->db->connect_error);
+					}
+
+					// Create table if not exists
+					$sql = 
+						"CREATE TABLE IF NOT EXISTS taskmanager(" .
+						"week INT NOT NULL, ";
+					foreach( $this->names as $name) {
+						$sql .= $name . " BOOL NOT NULL, ";
+					}
+					$sql .= "PRIMARY KEY ( week ) );";
+					$this->db->query($sql);
 				}
 
 				// Get the tasks of a week	
@@ -68,10 +97,16 @@
 
 				// Get the states of the tasks from the file. '' or 'checked'
 				protected function readTaskStates() {
-					if(file_exists('taskStates.txt')) {
-						if ($this->week == date("W", filemtime('taskStates.txt'))) {
-							$this->states = unserialize(file_get_contents('taskStates.txt'));
-						}
+					$sql = "SELECT ";
+					foreach ($this->names as $name) {
+						$sql .= $name . ", ";
+					} // note there will be an extra ", " at the end.
+					$sql = rtrim($sql, ", ") . " FROM taskmanager WHERE week=" .
+						$this->year . $this->week . ";";	
+					$res = $this->db->query($sql);
+					
+					if($res->num_rows == 1) {
+							$this->states = $res->fetch_assoc();
 					} else {
 						$this->resetTaskStates();
 					}
@@ -82,12 +117,29 @@
 					if (empty($this->states)) {
 						$this->readTaskStates();
 					}
-					return $this->states[$person];
+					if($this->states[$person])
+						return 'checked';
+					else
+						return '';
 				}
 				
 				// Save all task states.
 				protected function writeTaskStates() {
-					file_put_contents('taskStates.txt', serialize($this->states));
+					$sql = "REPLACE INTO taskmanager (week";
+					foreach ($this->names as $name) {
+						$sql .= ", " . $name;
+					}
+					$sql .=	") VALUES (" .
+						$this->year . $this->week;
+					foreach ($this->names as $name) {
+						if($this->states[$name])
+							$sql .= ", TRUE";
+						else
+							$sql .= ", FALSE";
+					}
+					$sql .= ");";
+
+					$this->db->query($sql);
 				}
 
 				// Set task states to given array.
@@ -115,9 +167,9 @@
 				$taskStates = array();
 				foreach ( array("Martijn", "Jorrit", "Tom") as $checkbox ) {
 					if(isset($_POST[$checkbox])) {
-						$taskStates[$checkbox] = "checked";
+						$taskStates[$checkbox] = TRUE;
 					} else {
-						$taskStates[$checkbox] = "";
+						$taskStates[$checkbox] = FALSE;
 					}
 				}
 				$tm->setTaskStates($taskStates);
@@ -125,6 +177,7 @@
 
 			$taak = $tm->getTasks();
 		?>		
+		
 		
 	</head>
 	<body>
@@ -176,12 +229,5 @@
 			</tr>
 		</table>
 		</form>
-
-
-		<!--The weather widget-->		
-		<!--
-		<hr>
-<iframe src="https://www.meteoblue.com/en/weather/widget/three/delft_netherlands_2757345?geoloc=fixed&nocurrent=1&days=4&tempunit=CELSIUS&windunit=KILOMETER_PER_HOUR&layout=bright"  frameborder="0" scrolling="NO" allowtransparency="true" sandbox="allow-same-origin allow-scripts allow-popups" style="width: 460px;height: 495px"></iframe> -->
-		<!--<div> DO NOT REMOVE THIS LINK <a href="https://www.meteoblue.com/en/weather/forecast/week/delft_netherlands_2757345?utm_source=weather_widget&utm_medium=linkus&utm_content=three&utm_campaign=Weather%2BWidget" target="_blank">meteoblue</a></div>-->
 	</body>
 </html>
