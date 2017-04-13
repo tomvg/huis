@@ -39,8 +39,9 @@ abstract class API
      * Allow for CORS, assemble and pre-process the data
      */
     public function __construct($request) {
-        header("Access-Control-Allow-Orgin: *"); //CORS: Allow all origins.
-        header("Access-Control-Allow-Methods: *"); //CORS: Allow all http methods.
+		// Don't use CORS untill we have applied authentication.
+        //header("Access-Control-Allow-Orgin: *"); //CORS: Allow all origins.
+        //header("Access-Control-Allow-Methods: *"); //CORS: Allow all http methods.
         header("Content-Type: application/json");
 
         $this->args = explode('/', rtrim($request, '/'));
@@ -84,11 +85,24 @@ abstract class API
 	/**
 	 * Method: processAPI
 	 * Checks if the requested endpoint has a method assigned to it.
-	 * If so, execute it, else return 404 error.
+	 * If so, execute it, else return 404 error. The enpoint function
+	 * should return an object with {data->data, status->status}. data will
+	 * be converted to json and status will be the http status that is
+	 * returned.
 	 */
     public function processAPI() {
         if (method_exists($this, $this->endpoint)) {
-            return $this->_response($this->{$this->endpoint}($this->args));
+			/**
+			 * Make a reflection method (class that gives info about a
+			 * method) to check if the function is public. Only regard
+			 * public functions a 'existing' for the API.
+			 */
+			$ref = new ReflectionMethod($this, $this->endpoint);
+			if ($ref->isPublic()) {
+				$res = $this->{$this->endpoint}($this->args);
+				return
+					$this->_response($res['data'], $res['status']);
+			}
         }
         return $this->_response("No Endpoint: $this->endpoint", 404);
     }

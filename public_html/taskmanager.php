@@ -9,9 +9,6 @@ class TaskManager extends API
 {
 	private $tasks;
 	private $names;
-	private $states;
-	private $week;
-	private $year;
 	private $db;
 
 	function __construct($request) {
@@ -51,32 +48,45 @@ class TaskManager extends API
 		$this->db->query($sql);
 	}
 
-	// Get the tasks of a week	
-	private function getTasks() {
+	/**
+	 * This function calculates the tasks and retrieves the states from the
+	 * database. Then returns them as
+	 * {tasks -> {name -> task}, 
+	 *  states -> {name -> state}}
+	 */
+	private function getTasks($year, $week) {
+		// calculate the tasks.
 		$weekTasks = array();
 		foreach ($this->names as $i => $name) {
-			$i1 = ($this->week + $i) % count($this->names);
-			$i2 = $this->week % count($this->tasks[$i1]);
+			$i1 = ($week + $i) % count($this->names);
+			$i2 = $week % count($this->tasks[$i1]);
 			$weekTasks[$name] = $this->tasks[$i1][$i2];
 		}
-		return $weekTasks;
-	}
-
-	// Get the states of the tasks from the file. '' or 'checked'
-	private function readTaskStates() {
+		
+		// Read the task states from the database.
 		$sql = "SELECT ";
 		foreach ($this->names as $name) {
 			$sql .= $name . ", ";
 		} // note there will be an extra ", " at the end.
 		$sql = rtrim($sql, ", ") . " FROM taskmanager WHERE week=" .
-			$this->year . $this->week . ";";	
+			$year . $week . ";";	
 		$res = $this->db->query($sql);
-		
+		// If indeed this row exists, save the result
 		if($res->num_rows == 1) {
-				$this->states = $res->fetch_assoc();
-		} else {
-			$this->resetTaskStates();
+				$states = $res->fetch_assoc();
+		} // Else, return all tasks unfinished without changing the database.
+		else {
+			$states = array();
+			foreach ($this->names as $name) {
+				$states[$name] = '0';
+			}
 		}
+		
+		return [
+		   	"tasks" => $weekTasks,
+			"states" => $states,
+		];
+				
 	}
 
 	// Return the task state of the person.
@@ -90,7 +100,7 @@ class TaskManager extends API
 			return '';
 	}
 	
-	// Save all task states.
+	/* Save all task states.
 	private function writeTaskStates() {
 		$sql = "REPLACE INTO taskmanager (week";
 		foreach ($this->names as $name) {
@@ -113,24 +123,15 @@ class TaskManager extends API
 	private function setTaskStates($taskStates) {
 		$this->states = $taskStates;
 		$this->writeTaskStates();
-	}
-
-	// Reset the states to '' and write.
-	private function resetTaskStates() {
-		$this->states = array();
-		foreach ($this->names as $name) {
-			$this->states[$name] = '';
-		}
-		$this->writeTaskStates();
-	}
+	}/*
 
 	/**
-	 * API endpoint task: Requires argument 'week'. Returns
+	 * API endpoint tasks: Requires argument 'week'. Returns
 	 * [person1->{task->task, state->state}, person2->{.. ]
 	 * Only covers get and put. Put only works for the current week (in the
 	 * timezone of the sever)
 	 */
-	public function task($args) {
+	public function tasks($args) {
 		// The first argument should be the yearweek.
 		$yearweek = array_shift($args);
 		// Check if this is invalid. Note that only the really strange
@@ -138,18 +139,20 @@ class TaskManager extends API
 		// are not actually weeks.
 		if( ! ctype_digit($yearweek) or strlen($yearweek) > 6) {
 			return [
-				"status" => 400,
-				"data" => "You have not provided a valid yearweek number. A
-				valid number is a string with the full year with the
+				'status' => 400,
+				'data' => "You have not provided a valid yearweek number. 
+				A valid number is a string with the full year with the
 				weeknumber concatenated to it.",
 			];
 			
 		}
 		// Separate year and week. *1 to make this integers.
-		$this->year = substr($yearweek, 0, 4)*1;
-		$this->week = substr($yearweek, 4)*1;
-		$this->readTaskStates();
-		return ['data' => $this->states, 'status' => 200,];
+		$year = substr($yearweek, 0, 4)*1;
+		$week = substr($yearweek, 4)*1;
+		return [
+			'data' => $this->getTasks($year, $week),
+			'status' => 200,
+		];
 		
 	}
 }
