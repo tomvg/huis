@@ -29,19 +29,27 @@ abstract class API
      */
     protected $args = Array();
     /**
-     * Property: file
-     * Stores the input of the PUT request
+     * Property: content
+     * Stores the input of the PUT or POST request
+	 * must be set by the concrete class.
      */
-     protected $file = Null;
+    public $content = Array();
+
+	/**
+	 * Property: request
+	 * Contains the request, JSON decoded.
+	 */
+	public $request = Null;
 
     /**
      * Constructor: __construct
      * Allow for CORS, assemble and pre-process the data
      */
-    public function __construct($request) {
+    public function __construct($request, $input) {
 		// Don't use CORS untill we have applied authentication.
         //header("Access-Control-Allow-Orgin: *"); //CORS: Allow all origins.
         //header("Access-Control-Allow-Methods: *"); //CORS: Allow all http methods.
+		echo "hey";
         header("Content-Type: application/json");
 
         $this->args = explode('/', rtrim($request, '/'));
@@ -67,14 +75,13 @@ abstract class API
         switch($this->method) {
         case 'DELETE':
         case 'POST':
-            $this->request = $this->_cleanInputs($_POST);
+            $this->request = $_POST;
             break;
         case 'GET':
-            $this->request = $this->_cleanInputs($_GET);
+            $this->request = $_GET;
             break;
         case 'PUT':
-            $this->request = $this->_cleanInputs($_GET);
-            $this->file = file_get_contents("php://input");
+            $this->request = $_GET;
             break;
         default:
             $this->_response('Invalid Method', 405);
@@ -115,24 +122,6 @@ abstract class API
     private function _response($data, $status = 200) {
         header("HTTP/1.1 " . $status . " " . $this->_requestStatus($status));
         return json_encode($data);
-    }
-	
-	/**
-	 * Method: _cleanInputs
-	 * Strip all html and php tags and remove whitespaces from
-	 * the beginning and end of the input.
-	 * If the input is an array then the above is done element wise.
-	 */
-    private function _cleanInputs($data) {
-        $clean_input = Array();
-        if (is_array($data)) {
-            foreach ($data as $k => $v) {
-                $clean_input[$k] = $this->_cleanInputs($v);
-            }
-        } else {
-            $clean_input = trim(strip_tags($data));
-        }
-        return $clean_input;
     }
 
 	/**

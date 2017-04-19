@@ -11,10 +11,14 @@ class TaskManager extends API
 	private $names;
 	private $db;
 
-	function __construct($request) {
+	function __construct($request, $input) {
+		
 		// Run the constructor of the abstract class.
-		parent::__construct($request);
+		parent::__construct($request, $input);
 
+		// Save the input
+		$this->content = json_decode(
+			$input, true);
 
 		$this->tasks = array(array("Stoffen", "Badkamer"), 
 							 array("Stofzuigen"),
@@ -89,41 +93,60 @@ class TaskManager extends API
 				
 	}
 
-	// Return the task state of the person.
-	private function getTaskState($person) {
-		if (empty($this->states)) {
-			$this->readTaskStates();
-		}
-		if($this->states[$person])
-			return 'checked';
-		else
-			return '';
-	}
-	
-	/* Save all task states.
-	private function writeTaskStates() {
-		$sql = "REPLACE INTO taskmanager (week";
+	/**
+	 * Save the provided task states to the sql database.
+	 * If a request key is an existing name, then its truth values will be
+	 * used. If a name is not in de request then its value will be set to
+	 * FALSE. All nonexisting names in the request are ignored.
+	 */
+	private function setTaskStates($year, $week) {
+		// Make the SQL request.
+		// Insert when table does not exist and give FALSE to names that
+		// were not given.
+		$sql = "INSERT INTO taskmanager (week";
 		foreach ($this->names as $name) {
 			$sql .= ", " . $name;
 		}
 		$sql .=	") VALUES (" .
-			$this->year . $this->week;
+			$year . $week;
 		foreach ($this->names as $name) {
-			if($this->states[$name])
-				$sql .= ", TRUE";
-			else
+			if(array_key_exists($name, $this->content)) {
+				if($this->content[$name]) {
+					$sql .= ", TRUE";
+				} else {
+					$sql .= ", FALSE";
+				}
+			}
+			else {
 				$sql .= ", FALSE";
+			} 
 		}
-		$sql .= ");";
+		// When this weakyear index exists, update the names that were
+		// given.
+		$sql .= ") ON DUPLICATE KEY UPDATE week = ";
+		$sql .= $year . $week; 	// Do this useless update so that we 
+								// never have an empty list of things 
+								// to update.
+		// Update the columns (names) that were given.
+		foreach ($this->names as $name) {
+			if(array_key_exists($name, $this->content)) {
+				$sql .= ", " . $name ." = ";
+				if($this->content[$name]) {
+					$sql .= "TRUE";
+				} else {
+					$sql .= "FALSE";
+				}
+			}
+		}
+		$sql .= ';';
 
+		// Perform the SQL request.
 		$this->db->query($sql);
+		return [
+			"data" => "Success",
+			"status"=> 200,
+		];
 	}
-
-	// Set task states to given array.
-	private function setTaskStates($taskStates) {
-		$this->states = $taskStates;
-		$this->writeTaskStates();
-	}/*
 
 	/**
 	 * API endpoint tasks: Requires argument 'week'. Returns
@@ -149,34 +172,36 @@ class TaskManager extends API
 		// Separate year and week. *1 to make this integers.
 		$year = substr($yearweek, 0, 4)*1;
 		$week = substr($yearweek, 4)*1;
-		return [
-			'data' => $this->getTasks($year, $week),
-			'status' => 200,
-		];
+		
+		switch($this->method) {
+		case 'GET':
+			return [
+				'data' => $this->getTasks($year, $week),
+				'status' => 200,
+			];
+			break;
+		// PUT and POST do the same thing in this case. They just update
+		// the statusses.
+		case 'PUT':
+		case 'POST':
+			return [
+				'data' => $this->setTaskStates($year, $week),
+				'status' => 200,
+			];
+			break;
+		default:
+			return [
+				'data' => 'Invalid Method',
+				'status' => 405,
+			];
+			break;
+		}
 		
 	}
 }
 
-
-
-$tm = new TaskManager($_REQUEST['request']);
+$tm = new TaskManager($_REQUEST['request'], 
+	file_get_contents('php://input'));
 echo $tm->processAPI();
 
-
-
-
-/*handle the submission of tasks
-if(isset($_POST['posted'])) {
-	$taskStates = array();
-	foreach ( array("Martijn", "Jorrit", "Tom") as $checkbox ) {
-		if(isset($_POST[$checkbox])) {
-			$taskStates[$checkbox] = TRUE;
-		} else {
-			$taskStates[$checkbox] = FALSE;
-		}
-	}
-	$tm->setTaskStates($taskStates);
-} 
-
-$taak = $tm->getTasks();*/
 ?>
