@@ -89,6 +89,8 @@ class TaskManager extends API
 		return [
 		   	"tasks" => $weekTasks,
 			"states" => $states,
+			"year" => $year,
+			"week" => $week,
 		];
 				
 	}
