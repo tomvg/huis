@@ -59,14 +59,6 @@ class TaskManager extends API
 	 *  states -> {name -> state}}
 	 */
 	private function getTasks($year, $week) {
-		// calculate the tasks.
-		$weekTasks = array();
-		foreach ($this->names as $i => $name) {
-			$i1 = ($week + $i) % count($this->names);
-			$i2 = $week % count($this->tasks[$i1]);
-			$weekTasks[$name] = $this->tasks[$i1][$i2];
-		}
-		
 		// Read the task states from the database.
 		$sql = "SELECT ";
 		foreach ($this->names as $name) {
@@ -85,10 +77,24 @@ class TaskManager extends API
 				$states[$name] = '0';
 			}
 		}
+
+		// Put it in the right format and add the task name.
+		$data = array();
+		foreach ($this->names as $i => $name) {
+			// Calculate the task.
+			$i1 = ($week + $i) % count($this->names);
+			$i2 = $week % count($this->tasks[$i1]);
+			$task = $this->tasks[$i1][$i2];
+
+			array_push($data, [
+				"name" => $name,
+				"task" => $task,
+				"state" => $states[$name],
+			]);
+		}
 		
 		return [
-		   	"tasks" => $weekTasks,
-			"states" => $states,
+		   	"data" => $data,
 			"year" => $year,
 			"week" => $week,
 		];
