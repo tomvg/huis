@@ -49,7 +49,6 @@ abstract class API
 		// Don't use CORS untill we have applied authentication.
         //header("Access-Control-Allow-Orgin: *"); //CORS: Allow all origins.
         //header("Access-Control-Allow-Methods: *"); //CORS: Allow all http methods.
-		echo "hey";
         header("Content-Type: application/json");
 
         $this->args = explode('/', rtrim($request, '/'));
