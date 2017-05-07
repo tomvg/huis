@@ -13,6 +13,15 @@
 		<!--A link to the used font-->
 		<link href="https://fonts.googleapis.com/css?family=Open+Sans:300,700&amp;subset=latin" rel="stylesheet" type="text/css">		
 
+		<!-- Load jquery --!>
+		<script
+			src="https://code.jquery.com/jquery-3.1.1.min.js"
+			integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8="
+			crossorigin="anonymous">
+		</script>
+		<!-- Load D3 --!>
+		<script src="https://d3js.org/d3.v4.min.js"></script>
+
 		<style>
 			h1 {
 				font-weight: 700;
@@ -36,198 +45,89 @@
 				margin-top : 2em;
 			}
 		</style>
-
-		<?php 
-			//Set the right timezone
-			date_default_timezone_set("Europe/Amsterdam"); 			
-			
-			class TaskManager {
-				private $tasks;
-				private $names;
-				private $states;
-				private $week;
-				private $year;
-				private $db;
-
-				function __construct() {
-					$this->tasks = array(array("Stoffen", "Badkamer"), 
-										 array("Stofzuigen"),
-										 array( "WC"));
-					$this->names = array("Martijn", "Jorrit", "Tom");
-					$this->week = date( "W" );
-					$this->year = date( "Y" );
-
-					$this->initialize_mysql();
-				}
-
-				// Build the mysql table
-				function initialize_mysql() {
-					// sqlserver.php should contain the dbhost, dbuser,
-					// dbpass and dbname variables.
-					include('sqlserver.php')
-					$this->db = new mysqli($dbhost, $dbuser,
-					   					   $dbpass, $dbname);
-					if($this->db->connect_errno > 0)
-					{
-						die('Could not connect: ' .
-						   	$this->db->connect_error);
-					}
-
-					// Create table if not exists
-					$sql = 
-						"CREATE TABLE IF NOT EXISTS taskmanager(" .
-						"week INT NOT NULL, ";
-					foreach( $this->names as $name) {
-						$sql .= $name . " BOOL NOT NULL, ";
-					}
-					$sql .= "PRIMARY KEY ( week ) );";
-					$this->db->query($sql);
-				}
-
-				// Get the tasks of a week	
-				function getTasks() {
-					$weekTasks = array();
-					foreach ($this->names as $i => $name) {
-						$i1 = ($this->week + $i) % count($this->names);
-						$i2 = $this->week % count($this->tasks[$i1]);
-						$weekTasks[$name] = $this->tasks[$i1][$i2];
-					}
-					return $weekTasks;
-				}
-
-				// Get the states of the tasks from the file. '' or 'checked'
-				protected function readTaskStates() {
-					$sql = "SELECT ";
-					foreach ($this->names as $name) {
-						$sql .= $name . ", ";
-					} // note there will be an extra ", " at the end.
-					$sql = rtrim($sql, ", ") . " FROM taskmanager WHERE week=" .
-						$this->year . $this->week . ";";	
-					$res = $this->db->query($sql);
-					
-					if($res->num_rows == 1) {
-							$this->states = $res->fetch_assoc();
-					} else {
-						$this->resetTaskStates();
-					}
-				}
-
-				// Return the task state of the person.
-				function getTaskState($person) {
-					if (empty($this->states)) {
-						$this->readTaskStates();
-					}
-					if($this->states[$person])
-						return 'checked';
-					else
-						return '';
-				}
-				
-				// Save all task states.
-				protected function writeTaskStates() {
-					$sql = "REPLACE INTO taskmanager (week";
-					foreach ($this->names as $name) {
-						$sql .= ", " . $name;
-					}
-					$sql .=	") VALUES (" .
-						$this->year . $this->week;
-					foreach ($this->names as $name) {
-						if($this->states[$name])
-							$sql .= ", TRUE";
-						else
-							$sql .= ", FALSE";
-					}
-					$sql .= ");";
-
-					$this->db->query($sql);
-				}
-
-				// Set task states to given array.
-				function setTaskStates($taskStates) {
-					$this->states = $taskStates;
-					$this->writeTaskStates();
-				}
-
-				// Reset the states to '' and write.
-				function resetTaskStates() {
-					$this->states = array();
-					foreach ($this->names as $name) {
-						$this->states[$name] = '';
-					}
-					$this->writeTaskStates();
-				}
-			}
-			
-
-
-			$tm = new TaskManager();
-
-			//handle the submission of tasks
-			if(isset($_POST['posted'])) {
-				$taskStates = array();
-				foreach ( array("Martijn", "Jorrit", "Tom") as $checkbox ) {
-					if(isset($_POST[$checkbox])) {
-						$taskStates[$checkbox] = TRUE;
-					} else {
-						$taskStates[$checkbox] = FALSE;
-					}
-				}
-				$tm->setTaskStates($taskStates);
-			} 
-
-			$taak = $tm->getTasks();
-		?>		
-		
-		
 	</head>
 	<body>
 		<!--Titel-->
 		<h1>AvS<span style="font-size:50%"> 179</span></h1>
+		<div id="scheduleDiv"></div>
 
-			<!--Het schoonmaakrooster-->		
-		<form action="default.php" method="post">
-		<table>
-			<input type="hidden" name="posted" value="true">
-			<tr>
-				<td>Martijn:</td>
-				<td><?=$taak["Martijn"]?></td>
-				<td>
-					<input
-					type="checkbox"
-					name="Martijn"
-					value="checked"
-					onclick="this.form.submit()"
-					<?=$tm->getTaskState("Martijn")?>
-					>
-				</input></td>
-			</tr>
-			<tr>
-				<td>Jorrit:</td>
-				<td><?=$taak["Jorrit"]?></td>
-				<td>
-					<input
-					type="checkbox"
-					name="Jorrit"
-					value="checked"
-					onclick="this.form.submit()"
-					<?=$tm->getTaskState("Jorrit")?>
-					>
-				</input></td>
-			</tr>
-			<tr>
-				<td>Tom:</td>
-				<td><?=$taak["Tom"]?></td>
-				<td>
-					<input
-					type="checkbox"
-					name="Tom"
-					value="checked"
-					onclick="this.form.submit()"
-					<?=$tm->getTaskState("Tom")?>
-					>
-				</input></td>
-			</tr>
-		</table>
-		</form>
+
+		<!-- Jquery to get the current tasks and states. --!>
+		<script>
+		// Get the year and week in server time.
+		var year = <?php echo date('Y');?>;
+		var week = <?php echo date('W');?>;
+
+		// Function that adds the schedule to the dom.
+		function makeSchedule(tasks, div) {
+			var table = d3.select(div).append('table');
+			
+			// This variable holds the columns that have to be created from
+			// the data. Each element in the array gives a column. The
+			// elements should be objects with cl and html keys set. 
+			// cl is just a string that will be given as the class of the
+			// elements in the column.
+			// html must be a function that takes the data that is assigned
+			// to the row and returns a dom object that will be placed in
+			// the table element.
+			var columns = [
+				// Name of the person.
+				{cl: 'name', html: function(r) { 
+					return document.createTextNode(r.name + ': '); 
+					}
+				},
+				// Name of the task.
+				{cl: 'task', html: function(r) { 
+					return document.createTextNode(r.task); 
+					}
+				},
+				// A checkbox to set the task a done (/undone).
+				{cl: 'state', html: function(r) { 
+					var cb = document.createElement('input');
+					cb.type = "checkbox";
+					cb.name = r.name;
+					cb.checked = r.state;
+
+					// Add a function that posts the change when a checkbox is
+					// changed.
+					$(cb).change(function() {
+						toPost = {};
+						toPost[r.name] = cb.checked;
+						$.post('tasks/' + tasks.year + tasks.week,
+							JSON.stringify(toPost));
+					});
+					return cb;
+				}
+			}];
+			
+			// Create the table using d3.
+			table.selectAll('tr')
+				  .data(tasks.data)
+				.enter()
+				  .append('tr')
+				.selectAll('td')
+				  .data(columns)
+				.enter()
+				  .append('td')
+				  .attr('class', function(c) {return c.cl})
+				  .append(function(c) {
+					  r = d3.select(this.parentNode).datum();
+					  return c.html(r);
+				  });
+		}
+		
+
+		// Retrieve the tasks of this week and run the function that adds
+		// the schedule.
+		$(document).ready(function() {
+			$.ajax({
+				url: "tasks/" + year + week
+			})
+			.then(function(tasks) {
+				makeSchedule(tasks, "#scheduleDiv");
+			});
+		});
+
+		</script>
 	</body>
 </html>
