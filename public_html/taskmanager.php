@@ -70,11 +70,15 @@ class TaskManager extends API
 		// If indeed this row exists, save the result
 		if($res->num_rows == 1) {
 				$states = $res->fetch_assoc();
+				// Convert to booleans
+				foreach ($this->names as $name) {
+					$states[$name] = (bool)$states[$name];
+				}
 		} // Else, return all tasks unfinished without changing the database.
 		else {
 			$states = array();
 			foreach ($this->names as $name) {
-				$states[$name] = '0';
+				$states[$name] = FALSE;
 			}
 		}
 
